@@ -196,3 +196,80 @@ end
   0.613773 seconds (1.13 M allocations: 1.605 GiB, 4.99% gc time, 0.46% compilation time)
 119.975070 seconds (374.90 M allocations: 413.286 GiB, 3.85% gc time, 0.07% compilation time)
 ```
+
+### Refactoring: "false sharing"
+
+Use a vector of vectors instead of a matrix. In `benchmark4.jl`:
+
+```
+function map_fidelity(potential_depth_values, separation_time_values; kwargs...)
+    N = length(potential_depth_values)
+    M = length(separation_time_values)
+    F = Vector{Vector{Float64}}(undef, M)
+
+    Threads.@threads for j in 1:M
+        @inbounds t_r = separation_time_values[j]
+        F_j = zeros(N)
+        @inbounds for i in 1:N
+            V0 = potential_depth_values[i]
+            F_j[i] = propagate_splitting(t_r, V0; kwargs...)
+        end
+        F[j] = F_j
+    end
+    return vcat(F...)
+
+end
+```
+
+```
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 1 benchmark4.jl
+  0.634388 seconds (1.13 M allocations: 1.605 GiB, 10.14% gc time)
+  0.619022 seconds (1.13 M allocations: 1.605 GiB, 6.21% gc time, 0.47% compilation time)
+156.127696 seconds (290.42 M allocations: 410.965 GiB, 5.66% gc time, 0.06% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 2 benchmark4.jl
+  0.639602 seconds (1.13 M allocations: 1.605 GiB, 10.56% gc time)
+  0.606554 seconds (1.13 M allocations: 1.605 GiB, 5.80% gc time, 0.48% compilation time)
+ 98.933797 seconds (305.89 M allocations: 411.390 GiB, 6.50% gc time, 0.11% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 4 benchmark4.jl
+  0.637588 seconds (1.13 M allocations: 1.605 GiB, 9.29% gc time)
+  0.612409 seconds (1.13 M allocations: 1.605 GiB, 5.37% gc time, 0.47% compilation time)
+ 98.618285 seconds (333.16 M allocations: 412.074 GiB, 5.18% gc time, 0.11% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 8 benchmark4.jl
+  0.637485 seconds (1.13 M allocations: 1.605 GiB, 8.71% gc time)
+  0.622894 seconds (1.13 M allocations: 1.605 GiB, 5.53% gc time, 0.49% compilation time)
+121.259312 seconds (373.66 M allocations: 413.257 GiB, 3.95% gc time, 0.09% compilation time)
+```
+
+### Sleeping
+
+Replace the `propagate_splitting` function with something trivial:
+
+```
+function propagate_splitting(
+        separation_time,
+        potential_depth;
+        kwargs...
+    )
+    sleep(0.6)
+    return rand()
+end
+```
+
+```
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 1 benchmark5.jl
+  0.601872 seconds (7 allocations: 176 bytes)
+  0.604645 seconds (90 allocations: 5.031 KiB, 0.46% compilation time)
+154.111709 seconds (73.22 k allocations: 3.763 MiB, 0.02% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 2 benchmark5.jl
+  0.601741 seconds (7 allocations: 176 bytes)
+  0.604557 seconds (90 allocations: 5.031 KiB, 0.45% compilation time)
+ 77.088923 seconds (73.25 k allocations: 3.765 MiB, 0.05% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 4 benchmark5.jl
+  0.601994 seconds (7 allocations: 176 bytes)
+  0.604744 seconds (90 allocations: 5.031 KiB, 0.45% compilation time)
+ 38.558808 seconds (73.31 k allocations: 3.768 MiB, 0.09% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 8 benchmark5.jl
+  0.601660 seconds (7 allocations: 176 bytes)
+  0.604487 seconds (90 allocations: 5.031 KiB, 0.45% compilation time)
+ 19.300890 seconds (73.41 k allocations: 3.775 MiB, 0.19% compilation time)
+```
