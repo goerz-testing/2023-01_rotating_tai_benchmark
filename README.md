@@ -115,3 +115,34 @@ Note: compared to the [original issue](https://discourse.julialang.org/t/scaling
   3.157171 seconds (4.70 M allocations: 1.745 GiB, 1.62% gc time, 0.05% compilation time)
 148.714731 seconds (459.50 M allocations: 416.672 GiB, 3.43% gc time, 0.06% compilation time)
 ```
+
+
+## Equal workload
+
+In `benchmark2.jl`:
+
+```
+potential_depth_values = fill(1.1MHz, 16)
+separation_time_values = fill(100μs, 16)
+```
+
+This means that every call to `propagate_splitting` does the same exact thing, so all threads should have the exact same workload.
+
+```
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 1 benchmark2.jl
+  0.629423 seconds (1.13 M allocations: 1.605 GiB, 9.97% gc time)
+  0.593253 seconds (1.13 M allocations: 1.605 GiB, 4.79% gc time, 0.47% compilation time)
+153.666410 seconds (290.36 M allocations: 410.962 GiB, 5.05% gc time, 0.04% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 2 benchmark2.jl
+  0.633268 seconds (1.13 M allocations: 1.605 GiB, 9.65% gc time)
+  0.596045 seconds (1.13 M allocations: 1.605 GiB, 4.71% gc time, 0.49% compilation time)
+ 98.435518 seconds (309.35 M allocations: 411.444 GiB, 6.31% gc time, 0.08% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 4 benchmark2.jl
+  0.644217 seconds (1.13 M allocations: 1.605 GiB, 9.94% gc time)
+  0.625575 seconds (1.13 M allocations: 1.605 GiB, 6.09% gc time, 0.46% compilation time)
+ 99.298586 seconds (333.82 M allocations: 412.088 GiB, 5.35% gc time, 0.08% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 8 benchmark2.jl
+  0.639156 seconds (1.13 M allocations: 1.605 GiB, 10.09% gc time)
+  0.618517 seconds (1.13 M allocations: 1.605 GiB, 6.23% gc time, 0.47% compilation time)
+121.498563 seconds (374.74 M allocations: 413.286 GiB, 3.96% gc time, 0.07% compilation time)
+```
