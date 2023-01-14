@@ -117,7 +117,7 @@ Note: compared to the [original issue](https://discourse.julialang.org/t/scaling
 ```
 
 
-## Equal workload
+### Equal workload
 
 In `benchmark2.jl`:
 
@@ -145,4 +145,54 @@ This means that every call to `propagate_splitting` does the same exact thing, s
   0.639156 seconds (1.13 M allocations: 1.605 GiB, 10.09% gc time)
   0.618517 seconds (1.13 M allocations: 1.605 GiB, 6.23% gc time, 0.47% compilation time)
 121.498563 seconds (374.74 M allocations: 413.286 GiB, 3.96% gc time, 0.07% compilation time)
+```
+
+### Refactoring: t_r outside of inner loop
+
+Relevant code from `benchmark3.jl`, cf. https://discourse.julialang.org/t/scaling-of-threads-for-trivially-parallel-problem/92949/5:
+
+```
+potential_depth_values = fill(1.1MHz, 16)
+separation_time_values = fill(100μs, 16)
+
+propagate_splitting(separation_time_values[1], potential_depth_values[1])
+@time propagate_splitting(separation_time_values[1], potential_depth_values[1])
+@time propagate_splitting(separation_time_values[end], potential_depth_values[end])
+
+function map_fidelity(potential_depth_values, separation_time_values; kwargs...)
+    N = length(potential_depth_values)
+    M = length(separation_time_values)
+    F = zeros(N, M)
+
+    Threads.@threads for j in eachindex(separation_time_values)
+        @inbounds t_r = separation_time_values[j]
+        @inbounds for i in eachindex(potential_depth_values)
+            V0 = potential_depth_values[i]
+            F[i, j] = propagate_splitting(t_r, V0; kwargs...)
+        end
+    end
+
+end
+
+@time map_fidelity(potential_depth_values, separation_time_values)
+```
+
+
+```
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 1 benchmark3.jl
+  0.637919 seconds (1.13 M allocations: 1.605 GiB, 10.09% gc time)
+  0.616912 seconds (1.13 M allocations: 1.605 GiB, 5.80% gc time, 0.46% compilation time)
+155.916642 seconds (290.35 M allocations: 410.961 GiB, 5.63% gc time, 0.04% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 2 benchmark3.jl
+  0.649860 seconds (1.13 M allocations: 1.605 GiB, 9.97% gc time)
+  0.619335 seconds (1.13 M allocations: 1.605 GiB, 5.39% gc time, 0.46% compilation time)
+101.228960 seconds (310.37 M allocations: 411.469 GiB, 6.39% gc time, 0.08% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 4 benchmark3.jl
+  0.647611 seconds (1.13 M allocations: 1.605 GiB, 10.04% gc time)
+  0.626761 seconds (1.13 M allocations: 1.605 GiB, 6.26% gc time, 0.46% compilation time)
+ 98.742242 seconds (333.60 M allocations: 412.081 GiB, 5.43% gc time, 0.08% compilation time)
+:> JULIA_EXCLUSIVE=1 julia --project=. -t 8 benchmark3.jl
+  0.630414 seconds (1.13 M allocations: 1.605 GiB, 7.85% gc time)
+  0.613773 seconds (1.13 M allocations: 1.605 GiB, 4.99% gc time, 0.46% compilation time)
+119.975070 seconds (374.90 M allocations: 413.286 GiB, 3.85% gc time, 0.07% compilation time)
 ```
