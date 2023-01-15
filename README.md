@@ -273,3 +273,70 @@ end
   0.604487 seconds (90 allocations: 5.031 KiB, 0.45% compilation time)
  19.300890 seconds (73.41 k allocations: 3.775 MiB, 0.19% compilation time)
 ```
+
+### Multi-process parallelization
+
+This solves the problem with `@distributed`. From `benchmark_distributed_driver.jl`:
+
+```
+function map_fidelity(potential_depth_values, separation_time_values; kwargs...)
+    N = length(potential_depth_values)
+    M = length(separation_time_values)
+
+    F = @sync @distributed (vcat) for j in 1:M
+        t_r = separation_time_values[j]
+        F_j = zeros(N)
+        for i in 1:N
+            V0 = potential_depth_values[i]
+            F_j[i] = propagate_splitting(t_r, V0; kwargs...)
+        end
+        F_j
+    end
+
+end
+
+@time F = map_fidelity(potential_depth_values, separation_time_values)
+```
+
+Note that some overhead here is expected due to the `vcat` reduction.
+
+```
+:> julia -p1 benchmark_distributed_driver.jl
+      From worker 2:      Activating project at `~/2023-01_rotating_tai_benchmark`
+  Activating project at `~/2023-01_rotating_tai_benchmark`
+  0.659220 seconds (1.13 M allocations: 1.605 GiB, 10.05% gc time)
+  0.623259 seconds (1.13 M allocations: 1.605 GiB, 6.04% gc time, 0.45% compilation time)
+159.409128 seconds (2.71 M allocations: 179.434 MiB, 0.01% gc time, 0.42% compilation time: 1% of which was recompilation)
+
+:> julia -p2 benchmark_distributed_driver.jl
+      From worker 3:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 2:      Activating project at `~/2023-01_rotating_tai_benchmark`
+  Activating project at `~/2023-01_rotating_tai_benchmark`
+  0.665675 seconds (1.13 M allocations: 1.605 GiB, 10.35% gc time)
+  0.631846 seconds (1.13 M allocations: 1.605 GiB, 6.31% gc time, 0.45% compilation time)
+ 91.579614 seconds (2.71 M allocations: 179.529 MiB, 0.02% gc time, 0.75% compilation time: 1% of which was recompilation)
+
+:> julia -p4 benchmark_distributed_driver.jl
+      From worker 3:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 2:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 4:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 5:      Activating project at `~/2023-01_rotating_tai_benchmark`
+  Activating project at `~/2023-01_rotating_tai_benchmark`
+  0.667681 seconds (1.13 M allocations: 1.605 GiB, 10.48% gc time)
+  0.623414 seconds (1.13 M allocations: 1.605 GiB, 6.34% gc time, 0.45% compilation time)
+ 56.961555 seconds (2.71 M allocations: 179.590 MiB, 0.04% gc time, 1.23% compilation time: 1% of which was recompilation)
+
+:> julia -p8 benchmark_distributed_driver.jl
+      From worker 6:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 3:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 5:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 2:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 7:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 4:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 8:      Activating project at `~/2023-01_rotating_tai_benchmark`
+      From worker 9:      Activating project at `~/2023-01_rotating_tai_benchmark`
+  Activating project at `~/2023-01_rotating_tai_benchmark`
+  0.640059 seconds (1.13 M allocations: 1.605 GiB, 9.37% gc time)
+  0.625552 seconds (1.13 M allocations: 1.605 GiB, 6.69% gc time, 0.44% compilation time)
+ 48.310770 seconds (2.71 M allocations: 179.714 MiB, 0.04% gc time, 1.51% compilation time: 1% of which was recompilation)
+```
