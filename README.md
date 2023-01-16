@@ -2,7 +2,7 @@
 
 See https://discourse.julialang.org/t/scaling-of-threads-for-trivially-parallel-problem/92949/1
 
-**Note**: The parallelization scaling issue was resolved by reducing the number of allocations. The original benchmark results are in the [old version of this README](https://github.com/goerz-testing/2023-01_rotating_tai_benchmark/blob/597a93ddc58b7e4cb92e6c8d3900f4776ddf748b/README.md#benchmark-of-julia-threads-for-trivially-parallel-problem).
+**Note**: The parallelization scaling issue was resolved [by reducing the number of allocations](https://github.com/goerz-testing/2023-01_rotating_tai_benchmark/commit/b155236e399147c88d29d9865ec3986be5e87aa0#diff-a9ead8c60453b6d7ff21448e0842318f1e7210160716c3eb26c5c10fe800160b). The original benchmark results are in the [old version of this README](https://github.com/goerz-testing/2023-01_rotating_tai_benchmark/blob/597a93ddc58b7e4cb92e6c8d3900f4776ddf748b/README.md#benchmark-of-julia-threads-for-trivially-parallel-problem).
 
 ```
 julia --project="." -e 'using Pkg; Pkg.instantiate()'
